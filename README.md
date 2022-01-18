@@ -1,3 +1,8 @@
+Personal Fork
+=============
+
+
+
 PyBecker - controlling Becker RF Shutter with Python
 ====================================================
 
