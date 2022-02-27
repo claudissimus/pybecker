@@ -54,6 +54,7 @@ class Becker:
             :type device_name: str
             :type init_dummy: bool
         """
+        self.retryCount = 0
         self.is_serial = "/" in device_name
         if self.is_serial and not os.path.exists(device_name):
             raise BeckerConnectionError(device_name + " is not existing")
@@ -72,8 +73,9 @@ class Becker:
 
     def _connect(self):
         if self.is_serial:
-            self.s = serial.Serial(self.device, 115200, timeout=1)
-            self.write_function = self.s.write
+            self.s = serial.Serial(self.device, 115200, timeout=1,writeTimeout=2)
+            # self.write_function = self.s.write
+            self.write_function = self._serial_write
         else:
             if ':' in self.device:
                 host, port = self.device.split(':', 1)
@@ -82,6 +84,24 @@ class Becker:
                 port = '5000'
             self.s = socket.create_connection((host, port))
             self.write_function = self._reconnecting_sendall
+
+    def _serial_write(self, data):
+        _LOGGER.warning("Sending serial data ({})...".format(self.retryCount))
+        try:
+            self.s.write(data)
+            self.retryCount = 0
+            _LOGGER.warning("serial: success.")
+        except (serial.SerialTimeoutException, serial.SerialException):
+            _LOGGER.warning("Timeout while sending data.")
+            # try to reconnect
+            if (self.retryCount<2):
+                self.retryCount += 1
+                _LOGGER.warning("Retry {}".format(self.retryCount))
+                self.s.close()
+                self._connect()
+                self._serial_write(data)
+            else:
+                _LOGGER.warning("Failed. Giving up.")
 
     def _reconnecting_sendall(self, *args, **kwargs):
         """Wrapper for socker.sendall that reconnects (once) on failure"""
