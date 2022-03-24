@@ -73,7 +73,8 @@ class Becker:
 
     def _connect(self):
         if self.is_serial:
-            self.s = serial.Serial(self.device, 115200, timeout=1,writeTimeout=2)
+            # because of too much timeout issues, we connect and disconnect on write and not on instantiation
+            # self.s = serial.Serial(self.device, 115200, timeout=1,writeTimeout=2)
             # self.write_function = self.s.write
             self.write_function = self._serial_write
         else:
@@ -88,20 +89,27 @@ class Becker:
     def _serial_write(self, data):
         _LOGGER.warning("Sending serial data ({})...".format(self.retryCount))
         try:
+            self.s = serial.Serial(self.device, 115200, timeout=1, writeTimeout=2)
             self.s.write(data)
-            self.retryCount = 0
-            _LOGGER.warning("serial: success.")
+            self.s.close()
         except (serial.SerialTimeoutException, serial.SerialException):
-            _LOGGER.warning("Timeout while sending data.")
-            # try to reconnect
-            if (self.retryCount<2):
-                self.retryCount += 1
-                _LOGGER.warning("Retry {}".format(self.retryCount))
-                self.s.close()
-                self._connect()
-                self._serial_write(data)
-            else:
-                _LOGGER.warning("Failed. Giving up.")
+                _LOGGER.warning("Timeout while sending data.")
+
+        # try:
+        #     self.s.write(data)
+        #     self.retryCount = 0
+        #     _LOGGER.warning("serial: success.")
+        # except (serial.SerialTimeoutException, serial.SerialException):
+        #     _LOGGER.warning("Timeout while sending data.")
+        #     # try to reconnect
+        #     if (self.retryCount<2):
+        #         self.retryCount += 1
+        #         _LOGGER.warning("Retry {}".format(self.retryCount))
+        #         self.s.close()
+        #         self._connect()
+        #         self._serial_write(data)
+        #     else:
+        #         _LOGGER.warning("Failed. Giving up.")
 
     def _reconnecting_sendall(self, *args, **kwargs):
         """Wrapper for socker.sendall that reconnects (once) on failure"""
